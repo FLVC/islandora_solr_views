@@ -21,7 +21,7 @@ class islandora_solr_views_handler_argument extends views_handler_argument {
     if (!empty($this->argument)) {
       $value = $this->argument;
 
-      $value = lesser_escape($value);
+      $value = islandora_solr_lesser_escape($value);
 
       $fieldname = $this->field;
 
