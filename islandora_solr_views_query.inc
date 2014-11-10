@@ -38,6 +38,19 @@ class islandora_solr_views_query extends views_plugin_query {
    */
   protected $fields;
 
+  /**
+   * An array of sections of the WHERE query. Each section is in itself
+   * an array of pieces and a flag as to whether or not it should be AND
+   * or OR.
+   */
+  protected $where = array();
+  
+  /**
+   * The default operator to use when connecting the WHERE groups. May be
+   * AND or OR.
+   */
+  protected $group_operator = 'AND';
+
   protected $islandora_solr_results;
 
   /**
@@ -61,7 +74,7 @@ class islandora_solr_views_query extends views_plugin_query {
 
   /**
    * Function execute.
-   * 
+   *
    * Executes the query and fills the associated view object with according
    * values.
    *
@@ -97,14 +110,28 @@ class islandora_solr_views_query extends views_plugin_query {
 
       // Add filters to parameters.
       if (isset($this->params['filters'])) {
-        $params['fq'] = $this->params['filters'];
+        // Need to see what filter group operations we may have present.
+        $group_ops = $this->where;
+        $constructed_group_params = array();
+        foreach ($this->params['filters'] as $group => $filter) {
+          // Filters that need to be grouped will come in as arrays.
+          if (is_array($filter)) {
+            $group_string = implode(" {$group_ops[$group]['type']} ", $filter);
+            $constructed_group_params[$group] = format_string("(!group_string)", array('!group_string' => $group_string));
+          }
+          else {
+            $params['f'][] = $filter;
+          }
+        }
+        $params['f'][] = implode(" {$this->group_operator} ", $constructed_group_params);
       }
 
       // Add sorting.
       if (isset($this->params['sort'])) {
+        module_load_include('inc', 'islandora_solr', 'includes/utilities');
         // Populate sorting parameters.
         foreach ($this->params['sort'] as $field => $order) {
-          $params['sort'][] = $field . ' ' . $order;
+          $params['sort'][] = islandora_solr_lesser_escape($field) . ' ' . $order;
         }
       }
 
@@ -117,9 +144,6 @@ class islandora_solr_views_query extends views_plugin_query {
         // Dismax.
         if (isset($this->params['defType']) AND $this->params['defType'] == 'dismax') {
           $dismax = $this->params['defType'];
-          // If no qf fields are specified in the requestHandler a default
-          // list is supplied here for dismax searches.
-          $params['qf'] = 'dc.title^5 dc.subject^2 dc.description^2 dc.creator^2 dc.contributor^1 dc.type';
         }
       }
       else {
@@ -135,18 +159,16 @@ class islandora_solr_views_query extends views_plugin_query {
         $params['defType'] = $dismax;
       }
 
+      // Add query (defaults to *:*).
+      $islandora_solr_query->buildQuery($query, $params);
+
       // Add solr limit.
       $islandora_solr_query->solrLimit = $this->pager->options['items_per_page'];
       // Add solr start.
       $islandora_solr_query->solrStart = $this->offset;
-      // Add query (defaults to *:*).
-      $islandora_solr_query->solrQuery = islandora_solr_restore_slashes($query);
-      // Add solr parameters.
-      $islandora_solr_query->solrParams = $params;
 
       // Excecute query.
       $islandora_solr_query->executeQuery(FALSE);
-
       // Solr results.
       $results = $islandora_solr_query->islandoraSolrResult;
       $object_results = $results['response']['objects'];
@@ -187,9 +209,16 @@ class islandora_solr_views_query extends views_plugin_query {
   /**
    * Function add_filter.
    */
-  public function add_filter($type, $value, $exclude = FALSE) {
+  public function add_filter($type, $value, $group, $exclude = FALSE) {
+    module_load_include('inc', 'islandora_solr', 'includes/utilities');
     $exclude_string = ($exclude) ? '-' : '';
-    $this->params['filters'][] = $exclude_string . $type . ':' . $value;
+    if ($group) {
+      $this->params['filters'][$group][] = $exclude_string . islandora_solr_lesser_escape($type) . ':' . $value;
+    }
+    else {
+      $this->params['filters'][] = $exclude_string . islandora_solr_lesser_escape($type) . ':' . $value;
+
+    }
   }
 
   /**
