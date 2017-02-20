@@ -25,7 +25,7 @@ class islandora_solr_views_handler_argument extends views_handler_argument {
         $values = array_filter($value);
         // Ensure that some values have been selected.
         if (!empty($values)) {
-          $this->query->add_filter($fieldname, '(' . implode('OR', $values) . ')', $group);
+          $this->query->add_filter($fieldname, '(' . implode(' OR ', $values) . ')', $group);
         }
         return;
       }
