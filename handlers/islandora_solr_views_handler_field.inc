@@ -38,6 +38,9 @@ class islandora_solr_views_handler_field extends views_handler_field {
     if (isset($values->{$alias})) {
       if (is_array($values->{$alias})) {
         $values->{$alias} = array_filter($values->{$alias}, 'trim');
+        if (!empty($this->options['use_OR_delimiter'])) {
+          return implode(" OR ", $values->{$alias});
+        }
         return implode(", ", $values->{$alias});
       }
       else {
@@ -52,6 +55,7 @@ class islandora_solr_views_handler_field extends views_handler_field {
   function option_definition() {
     $options = parent::option_definition();
     $options['link_to_object'] = TRUE;
+    $options['use_OR_delimiter'] = TRUE;
     return $options;
   }
 
@@ -64,6 +68,12 @@ class islandora_solr_views_handler_field extends views_handler_field {
       '#description' => t("Enabling this will override any existing links in this field."),
       '#type' => 'checkbox',
       '#default_value' => !empty($this->options['link_to_object']),
+    );
+    $form['use_OR_delimiter'] = array(
+      '#title' => t('Use OR delimiter for multivalued field.'),
+      '#description' => t("Enabling this will add \" OR \" between values if this is a multivalued field."),
+      '#type' => 'checkbox',
+      '#default_value' => !empty($this->options['use_OR_delimiter']),
     );
 
     parent::options_form($form, $form_state);
